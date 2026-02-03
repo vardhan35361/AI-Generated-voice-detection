@@ -1,53 +1,39 @@
-import uvicorn
+import os
+import requests
 from fastapi import FastAPI, HTTPException, Header
 from pydantic import BaseModel
-import requests
 
 app = FastAPI()
 
-# Data model for the incoming request
+# Use Environment Variable from Render Settings
+VALID_AUTH_KEY = os.getenv("AUTH_KEY", "default-secret-key")
+
 class DetectionRequest(BaseModel):
     message: str
     audio_url: str
 
+@app.get("/")
+def health():
+    return {"status": "Service is online"}
+
 @app.post("/detect")
 async def detect_voice(request: DetectionRequest, authorization: str = Header(None)):
-    # 1. Validation: Check for Authorization Header
-    # Replace 'your-secret-key' with your actual expected key or logic
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Missing Authorization Header")
+    if authorization != VALID_AUTH_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
     try:
-        # 2. Process Audio: Download the file from the provided URL
-        response = requests.get(request.audio_url, timeout=10)
-        if response.status_code != 200:
-            raise HTTPException(status_code=400, detail="Could not download audio from URL")
-        
-        audio_content = response.content
-        
-        # 3. AI Logic Placeholder
-        # This is where you would load your model and run: 
-        # result = model.predict(audio_content)
-        # For now, we return a mock response that matches standard API formats
-        prediction = "AI-Generated" # or "Real"
-        confidence = 0.98
+        # Check if URL is valid
+        audio_response = requests.get(request.audio_url, timeout=10)
+        audio_response.raise_for_status()
 
-        # 4. Return the JSON Response
+        # Mock result
         return {
             "status": "success",
             "test_message": request.message,
-            "prediction": prediction,
-            "confidence_score": confidence,
+            "prediction": "Real",
+            "confidence_score": 0.99,
             "language": "Multi-Language-Detected",
             "error": None
         }
-
     except Exception as e:
-        return {
-            "status": "error",
-            "error": str(e)
-        }
-
-if __name__ == "__main__":
-    # Runs the server on localhost:8000
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+        return {"status": "error", "error": str(e)}
